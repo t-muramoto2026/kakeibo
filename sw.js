@@ -6,7 +6,7 @@
 //    新しい版が表示される。
 //  - アイコンなど、めったに変わらないファイルは「キャッシュ優先」で素早く表示する。
 //  - sw.js や アイコン を変えたときは CACHE_VERSION の数字を上げると、古いキャッシュが削除される。
-const CACHE_VERSION = 'kakeibo-v3';
+const CACHE_VERSION = 'kakeibo-v4';
 const APP_SHELL = [
   './',
   './index.html',

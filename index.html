@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#E6F4EF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0F1D1A" media="(prefers-color-scheme: dark)">
 <meta name="description" content="支出・収入を記録し、大項目別の内訳や月別集計を確認できる家計簿アプリ">
@@ -80,6 +80,9 @@
     --shadow-btn: 0 6px 16px rgba(0, 0, 0, 0.35);
   }
   *{ box-sizing: border-box; }
+  /* 2本指での拡大縮小・ダブルタップでの拡大を無効にする（縦横のスクロールだけ許可） */
+  html, body, *{ touch-action: pan-x pan-y; }
+  html{ -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html,body{ margin:0; padding:0; }
   [hidden]{ display: none !important; }
   body{
@@ -175,8 +178,8 @@
   .card-header h2{ margin: 0; }
   .year-select{
     width: auto; flex-shrink: 0;
-    padding: 7px 34px 7px 14px;
-    font-size: 13px;
+    padding: 6px 34px 6px 14px;
+    font-size: 16px;
     border-radius: 999px;
   }
   .card-note{ font-size: 13px; color: var(--ink-soft); margin: -6px 0 14px; line-height: 1.6; }
@@ -239,7 +242,7 @@
   .toggle button.active.expense-active{ background: var(--expense); color: #FFFFFF; }
   .toggle button.active.income-active{ background: var(--income); color: var(--on-accent); }
   input, select{
-    font-size: 15px;
+    font-size: 16px;
     padding: 11px 14px;
     border: 1.5px solid var(--border);
     border-radius: var(--r-ctrl);
@@ -2564,6 +2567,22 @@ async function init(){
     });
   }
 }
+// --- 拡大縮小の防止 ---
+// iPhone(Safari)は表示設定の拡大禁止を無視するため、ジェスチャー自体を止める。
+// ダブルタップでの拡大は touch-action（CSS）で止めているので、電卓の連続タップはそのまま効く。
+(function preventZoomGestures(){
+  const stop = (e)=>{ e.preventDefault(); };
+  ['gesturestart','gesturechange','gestureend'].forEach(type=>{
+    document.addEventListener(type, stop, { passive: false });
+  });
+  document.addEventListener('touchmove', (e)=>{
+    if(e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+  // トラックパッドのピンチ（ctrl+ホイール）も止める
+  document.addEventListener('wheel', (e)=>{
+    if(e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+})();
 init();
 </script>
 </body>
