@@ -28,6 +28,7 @@
     --indigo: #23866E;
     --indigo-soft: #2FA98A;
     --accent-pale: #D5EFE6;
+    --today-bg: #B5E0D0;
     --income: #23866E;
     --expense: #D65A43;
     --border: #D6E8E1;
@@ -51,6 +52,7 @@
       --indigo: #4FC7A5;
       --indigo-soft: #6BD6B7;
       --accent-pale: #1F3E36;
+      --today-bg: #2E6356;
       --income: #5FCFAE;
       --expense: #F08B76;
       --border: #28433C;
@@ -71,6 +73,7 @@
     --indigo: #4FC7A5;
     --indigo-soft: #6BD6B7;
     --accent-pale: #1F3E36;
+    --today-bg: #2E6356;
     --income: #5FCFAE;
     --expense: #F08B76;
     --border: #28433C;
@@ -458,6 +461,9 @@
   .day-cell{ cursor: pointer; }
   .day-cell:hover{ background: var(--accent-pale); }
   .day-cell:focus-visible{ outline: 2px solid var(--indigo-soft); outline-offset: -2px; }
+  /* 明細カレンダーの「今日」 */
+  .day-cell.is-today, .day-cell.is-today:hover{ background: var(--today-bg); }
+  .day-cell.is-today .calendar-day{ color: var(--ink); font-weight: 900; }
 
   /* --- bars / breakdown --- */
   .bar-row{ margin-bottom: 12px; }
@@ -1947,7 +1953,9 @@ function renderTxnCalendar(list){
     if(totals && totals.expense) amounts += `<span class="calendar-amt expense">${numOnly(totals.expense)}</span>`;
     if(totals && totals.income) amounts += `<span class="calendar-amt income">${numOnly(totals.income)}</span>`;
     const dateStr = `${viewYear}-${pad(viewMonth+1)}-${pad(day)}`;
-    html += `<div class="calendar-cell day-cell" data-date="${dateStr}" role="button" tabindex="0"><span class="calendar-day">${day}</span>${amounts}</div>`;
+    const todayCls = dateStr === todayISO() ? ' is-today' : '';
+    const todayLabel = todayCls ? ' aria-current="date"' : '';
+    html += `<div class="calendar-cell day-cell${todayCls}" data-date="${dateStr}" role="button" tabindex="0"${todayLabel}><span class="calendar-day">${day}</span>${amounts}</div>`;
   }
   // 常に6週分のマスを確保し、月をまたいでもカレンダーの高さが変わらないようにする
   const trailing = 42 - (firstWeekday + daysInMonth);
