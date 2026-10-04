@@ -593,6 +593,42 @@
   .modal-breakdown h3{ font-size: 13px; color: var(--ink-soft); font-weight: 700; margin: 0 0 10px 0; }
   .modal-text{ font-size: 14px; color: var(--ink-soft); margin: 0 0 18px; line-height: 1.6; }
 
+  /* --- 右下に浮かぶ記録ボタン（上の記録ボタンが見えなくなったら表示） --- */
+  #mainView{ padding-bottom: 76px; }
+  .fab{
+    position: fixed;
+    right: calc(18px + env(safe-area-inset-right, 0px));
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    width: 58px; height: 58px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--indigo); color: var(--on-accent);
+    box-shadow: 0 8px 20px rgba(35, 134, 110, 0.38), 0 2px 6px rgba(0, 0, 0, 0.12);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    opacity: 0; transform: translateY(14px) scale(0.7);
+    pointer-events: none; visibility: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+  }
+  .fab.show{
+    opacity: 1; transform: none; pointer-events: auto; visibility: visible;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s;
+  }
+  .fab:focus-visible{ outline: 3px solid var(--indigo-soft); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce){ .fab, .fab.show{ transition: none; } }
+
+  /* --- 記録前の確認画面 --- */
+  .confirm-amount{
+    text-align: center; font-size: 30px; font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    background: var(--surface-soft); border-radius: var(--r-inner);
+    padding: 14px 10px; margin-bottom: 14px;
+  }
+  .confirm-amount.expense{ color: var(--expense); }
+  .confirm-amount.income{ color: var(--income); }
+  .confirm-rows .detail-row{ padding-bottom: 10px; }
+  .confirm-rows{ gap: 10px; }
+
   /* --- links / detail --- */
   .entry-link{ display: block; text-align: center; text-decoration: none; }
   .txn-link{
@@ -694,6 +730,9 @@
     <div class="backup-notice" id="backupNotice" hidden></div>
   </div>
 </div>
+<a href="#entry" class="fab" id="recordFab" aria-label="支出・収入を記録する" title="支出・収入を記録する" tabindex="-1" aria-hidden="true">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+</a>
 <div class="sheet" id="entryView" hidden>
   <div class="detail-topbar">
     <button type="button" class="back-link" id="entryBackBtn">‹ 戻る</button>
@@ -829,6 +868,24 @@
     <div class="row">
       <button type="button" class="cancel-btn" id="deleteConfirmCancelBtn">キャンセル</button>
       <button type="button" class="danger-btn" id="deleteConfirmOkBtn">削除する</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="entryConfirmOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="entryConfirmLabel" style="max-width: 360px;">
+    <div class="modal-header">
+      <h2 id="entryConfirmLabel">この内容で記録しますか？</h2>
+    </div>
+    <div class="confirm-amount" id="entryConfirmAmount"></div>
+    <div class="detail-rows confirm-rows">
+      <div class="detail-row"><span class="detail-label">種別</span><span class="detail-value" id="entryConfirmType"></span></div>
+      <div class="detail-row"><span class="detail-label">項目</span><span class="detail-value" id="entryConfirmCategory"></span></div>
+      <div class="detail-row"><span class="detail-label">日付</span><span class="detail-value" id="entryConfirmDate"></span></div>
+      <div class="detail-row"><span class="detail-label">メモ</span><span class="detail-value" id="entryConfirmMemo"></span></div>
+    </div>
+    <div class="row" style="margin-top: 18px;">
+      <button type="button" class="cancel-btn" id="entryConfirmCancelBtn">修正する</button>
+      <button type="button" class="submit-btn" id="entryConfirmOkBtn">記録する</button>
     </div>
   </div>
 </div>
@@ -2196,6 +2253,9 @@ document.addEventListener('keydown', (e)=>{
   if(e.key === 'Escape' && !document.getElementById('categoryDeleteOverlay').hidden){
     closeCategoryDelete();
   }
+  if(e.key === 'Escape' && !document.getElementById('entryConfirmOverlay').hidden){
+    closeEntryConfirm();
+  }
 });
 // --- detail view (linked from each row in 明細) ---
 let currentDetailId = null;
@@ -2333,6 +2393,32 @@ function renderMonthSubView(key, major, sub){
   }).join('');
 }
 let currentViewName = 'main';
+// 右下の記録ボタン：メイン画面で、上の「支出・収入を記録する」ボタンが画面外にあるときだけ表示する
+let topRecordBtnVisible = true;
+function updateRecordFab(){
+  const fab = document.getElementById('recordFab');
+  if(!fab) return;
+  const show = currentViewName === 'main' && !topRecordBtnVisible;
+  fab.classList.toggle('show', show);
+  fab.setAttribute('aria-hidden', show ? 'false' : 'true');
+  fab.tabIndex = show ? 0 : -1;
+}
+(function watchTopRecordButton(){
+  const topBtn = document.querySelector('#mainView .cta-btn');
+  if(!topBtn) return;
+  if(!('IntersectionObserver' in window)){
+    // 古いブラウザでは常に表示する
+    topRecordBtnVisible = false;
+    return;
+  }
+  new IntersectionObserver((entries)=>{
+    const e = entries[entries.length - 1];
+    // メイン画面が非表示の間（ボタンの大きさが0）は判定を変えない
+    if(e.boundingClientRect.height === 0) return;
+    topRecordBtnVisible = e.isIntersecting;
+    updateRecordFab();
+  }, { threshold: 0 }).observe(topBtn);
+})();
 let mainScrollY = null;
 function showView(name){
   const prevView = currentViewName;
@@ -2352,6 +2438,7 @@ function showView(name){
   } else if(prevView !== 'main' && mainScrollY !== null){
     window.scrollTo(0, mainScrollY);
   }
+  updateRecordFab();
   // 中項目の明細（monthsub）から戻ってきたときは、元の内訳ポップアップを開き直す
   if(name === 'main' && prevView === 'monthsub' && monthModalReturn){
     const { category, key } = monthModalReturn;
@@ -2531,10 +2618,11 @@ document.getElementById('prevMonth').addEventListener('click', ()=> goPrevMonth(
 document.getElementById('nextMonth').addEventListener('click', ()=> goNextMonth());
 document.getElementById('txnPrevMonth').addEventListener('click', ()=> goPrevMonth(document.getElementById('txnCard')));
 document.getElementById('txnNextMonth').addEventListener('click', ()=> goNextMonth(document.getElementById('txnCard')));
-document.getElementById('entryForm').addEventListener('submit', async (e)=>{
-  e.preventDefault();
+// 「記録する」を押したら、保存する前に確認画面を出す
+let pendingEntry = null;
+function buildEntryBody(){
   const amount = entryAmount;
-  if(!amount || amount<=0) return;
+  if(!amount || amount<=0) return null;
   const category = currentType === 'expense'
     ? document.getElementById('categorySelect').value
     : document.getElementById('subCategorySelect').value;
@@ -2543,13 +2631,55 @@ document.getElementById('entryForm').addEventListener('submit', async (e)=>{
     : null;
   const date = entryDate || todayISO();
   const memo = document.getElementById('memoInput').value.trim();
-  const body = { type: currentType, amount, category, subCategory, date, memo, createdAt: Date.now() };
-  const wasEditing = !!editingId;
-  if(wasEditing){
-    await updateTransaction(editingId, body);
+  return { type: currentType, amount, category, subCategory, date, memo, createdAt: Date.now() };
+}
+function openEntryConfirm(body){
+  pendingEntry = { body, editingId };
+  const isEdit = !!editingId;
+  document.getElementById('entryConfirmLabel').textContent = isEdit ? 'この内容で更新しますか？' : 'この内容で記録しますか？';
+  document.getElementById('entryConfirmOkBtn').textContent = isEdit ? '更新する' : '記録する';
+  const amountEl = document.getElementById('entryConfirmAmount');
+  amountEl.textContent = (body.type==='income' ? '+' : '−') + yen(body.amount);
+  amountEl.className = 'confirm-amount ' + body.type;
+  document.getElementById('entryConfirmType').textContent = body.type==='income' ? '収入' : '支出';
+  document.getElementById('entryConfirmCategory').textContent = body.category + (body.subCategory ? ' > ' + body.subCategory : '');
+  const wd = ['日','月','火','水','木','金','土'][new Date(body.date+"T00:00:00").getDay()];
+  document.getElementById('entryConfirmDate').textContent = `${formatFullDate(body.date)}（${wd}）`;
+  document.getElementById('entryConfirmMemo').textContent = body.memo || '（なし）';
+  document.getElementById('entryConfirmOkBtn').disabled = false;
+  document.getElementById('entryConfirmOverlay').hidden = false;
+  document.getElementById('entryConfirmOkBtn').focus({ preventScroll: true });
+}
+function closeEntryConfirm(){
+  document.getElementById('entryConfirmOverlay').hidden = true;
+  pendingEntry = null;
+}
+document.getElementById('entryConfirmCancelBtn').addEventListener('click', closeEntryConfirm);
+document.getElementById('entryConfirmOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'entryConfirmOverlay') closeEntryConfirm();
+});
+document.getElementById('entryForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const body = buildEntryBody();
+  if(!body){
+    // 金額が未入力のときは電卓を開く
+    openCalcPad();
+    return;
+  }
+  openEntryConfirm(body);
+});
+document.getElementById('entryConfirmOkBtn').addEventListener('click', async ()=>{
+  if(!pendingEntry) return;
+  const okBtn = document.getElementById('entryConfirmOkBtn');
+  okBtn.disabled = true; // 二重登録を防ぐ
+  const { body, editingId: targetId } = pendingEntry;
+  closeEntryConfirm();
+  if(targetId){
+    await updateTransaction(targetId, body);
   } else {
     await addTransaction(body);
   }
+  const date = body.date;
   const d = new Date(date+"T00:00:00");
   viewYear = d.getFullYear();
   viewMonth = d.getMonth();
